@@ -12,19 +12,29 @@ module.exports = async (logSources, printer) => {
   await Promise.all(logSources.map(async (logSource, logSourceIndex) => {
     const log = await logSource.popAsync();
     if (log) {
-      logHeap.push({log, logSourceIndex});
+      logHeap.push({
+        log: log,
+        logSourceIndex: logSourceIndex,
+        //set up the next log promise from the log source to kick that off
+        nextLogPromise: logSource.popAsync()
+      });
     }
   }));
 
   //process the logs in the heap, pushing the next log from the log source as a log is processed
   while (!logHeap.isEmpty()) {
-    const { log, logSourceIndex } = logHeap.pop();
+    const { log, logSourceIndex, nextLogPromise } = logHeap.pop();
     printer.print(log);
 
     //need to wait until the next log is pushed to the heap before proceeding
-    const nextLog = await logSources[logSourceIndex].popAsync();
+    const nextLog = await nextLogPromise;
     if (nextLog) {
-      logHeap.push({ log: nextLog, logSourceIndex });
+      logHeap.push({
+        log: nextLog,
+        logSourceIndex: logSourceIndex,
+        //set up the next log promise from the log source to kick that off
+        nextLogPromise: logSources[logSourceIndex].popAsync()
+      });
     }
   }
 
